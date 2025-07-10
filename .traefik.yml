@@ -1,7 +1,7 @@
 displayName: S3 Authorization Plugin
 type: middleware
 iconPath: .assets/icon.png
-import: https://github.com/csobrinho/traefik-s3-auth-middleware
+import: github.com/csobrinho/traefik-s3-auth-middleware
 summary: "Traefik middleware plugin that validates the S3 Authorization header"
 
 testData:
