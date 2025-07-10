@@ -1,0 +1,106 @@
+version: "2"
+linters:
+  default: all
+  disable:
+    - cyclop
+    - err113
+    - exhaustruct
+    - gochecknoglobals
+    - gochecknoinits
+    - ireturn
+    - lll
+    - nilnil
+    - testpackage
+    - varnamelen
+    - canonicalheader
+  settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: github.com/instana/testify
+              desc: not allowed
+    funlen:
+      lines: -1
+      statements: 120
+    godox:
+      keywords:
+        - FIXME
+    misspell:
+      locale: US
+    revive:
+      rules:
+        - name: struct-tag
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+          disabled: true
+        - name: if-return
+        - name: increment-decrement
+        - name: var-naming
+        - name: var-declaration
+        - name: package-comments
+          disabled: true
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+          disabled: true
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unused-parameter
+          disabled: true
+        - name: unreachable-code
+        - name: redefines-builtin-id
+    testpackage:
+      allow-packages:
+        - fail2ban
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - funlen
+        path: (.+)_test.go
+      - linters:
+          - cyclop
+        path: fail2ban.go
+        text: calculated cyclomatic complexity for function New is 13
+      - linters:
+          - gosec
+        path: fail2ban.go
+        text: 'G304: Potential file inclusion via variable'
+      - linters:
+          - forbidigo
+        text: use of `fmt.Printf` forbidden
+      - linters:
+          - forbidigo
+        text: use of `fmt.Print` forbidden
+      - linters:
+          - forbidigo
+        text: use of `fmt.Println` forbidden
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
