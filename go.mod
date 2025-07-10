@@ -1,3 +1,3 @@
 module github.com/csobrinho/traefik-s3-auth-middleware
 
-go 1.24
+go 1.19
