@@ -2,7 +2,6 @@ package traefik_s3_auth_middleware
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -88,17 +87,17 @@ func (ka *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 		return
 	}
-	response := Response{
-		Message:    "invalid S3 authorization. Requests must be properly signed with a valid access id and secret key",
-		StatusCode: http.StatusForbidden,
-		Error:      err.Error(),
-	}
-	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
-	rw.WriteHeader(response.StatusCode)
-	if err := json.NewEncoder(rw).Encode(response); err != nil {
-		fmt.Printf("error when sending response to an invalid S3 authorization: %s", err.Error())
-	}
-	for k, v := range req.Header {
-		fmt.Fprintf(rw, "request header: %s: %s\n", k, v)
-	}
+	// response := Response{
+	// 	Message:    "invalid S3 authorization. Requests must be properly signed with a valid access id and secret key",
+	// 	StatusCode: http.StatusForbidden,
+	// 	Error:      err.Error(),
+	// }
+	// rw.Header().Set("Content-Type", "application/json; charset=utf-8")
+	// rw.WriteHeader(response.StatusCode)
+	// if err := json.NewEncoder(rw).Encode(response); err != nil {
+	// 	fmt.Printf("error when sending response to an invalid S3 authorization: %s", err.Error())
+	// }
+	// for k, v := range req.Header {
+	// 	fmt.Fprintf(rw, "request header: %s: %s\n", k, v)
+	// }
 }
