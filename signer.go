@@ -14,6 +14,10 @@ import (
 	"strings"
 )
 
+var mapping = map[string]string{
+	"host": ":authority",
+}
+
 func ValidateHeader(req *http.Request, headerName string, creds map[string]Credential) error {
 	h := req.Header.Get(headerName)
 
@@ -42,14 +46,11 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 	}
 	sh := map[string]string{}
 	for _, k := range a.SignedHeaders {
-		k = strings.ToLower(k)
-		v := req.Header.Values(k)
-
-		if len(v) == 0 {
+		v, ok := resolveHeader(k, req.Header)
+		if !ok {
 			return fmt.Errorf("missing signed header: %q", k)
 		}
-
-		sh[k] = strings.Join(v, ", ")
+		sh[k] = v
 	}
 
 	s3 := &s3request{
@@ -71,6 +72,19 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 
 	// Signature is valid.
 	return nil
+}
+
+func resolveHeader(name string, h http.Header) (string, bool) {
+	v := h.Values(name)
+	if v == nil {
+		v = h.Values(strings.ToLower(name))
+	}
+	if v == nil {
+		if hh, ok := mapping[strings.ToLower(name)]; ok {
+			return resolveHeader(hh, h)
+		}
+	}
+	return strings.Join(v, ", "), len(v) > 0
 }
 
 type Authorization struct {
