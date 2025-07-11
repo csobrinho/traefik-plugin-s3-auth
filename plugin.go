@@ -87,6 +87,8 @@ func (ka *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 		return
 	}
+	rw.WriteHeader(http.StatusForbidden)
+
 	// response := Response{
 	// 	Message:    "invalid S3 authorization. Requests must be properly signed with a valid access id and secret key",
 	// 	StatusCode: http.StatusForbidden,
