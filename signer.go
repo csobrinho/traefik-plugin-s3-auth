@@ -15,7 +15,7 @@ import (
 )
 
 var mapping = map[string]string{
-	"host": ":authority",
+	"host": "x-forwarded-host",
 }
 
 func ValidateHeader(req *http.Request, headerName string, creds map[string]Credential) error {
