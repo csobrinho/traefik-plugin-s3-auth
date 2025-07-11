@@ -98,4 +98,7 @@ func (ka *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if err := json.NewEncoder(rw).Encode(response); err != nil {
 		fmt.Printf("error when sending response to an invalid S3 authorization: %s", err.Error())
 	}
+	for k, v := range req.Header {
+		fmt.Fprintf(rw, "request header: %s: %s\n", k, v)
+	}
 }
