@@ -1,4 +1,4 @@
-package traefik_s3_auth_middleware
+package plugin
 
 // Adapted from https://github.com/bluecatengineering/traefik-aws-plugin/blob/main/signer/signer.go
 
@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -26,9 +27,9 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 	if err != nil {
 		return fmt.Errorf("failed to parse authorization header: %w", err)
 	}
-	cred, ok := creds[a.AccessKeyId]
+	cred, ok := creds[a.AccessKeyID]
 	if !ok {
-		return fmt.Errorf("unknown access key id: %q", a.AccessKeyId)
+		return fmt.Errorf("unknown access key id: %q", a.AccessKeyID)
 	}
 	if cred.Region != a.Region {
 		return fmt.Errorf("region mismatch: expected %q, got %q", cred.Region, a.Region)
@@ -36,6 +37,7 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 	if cred.Service != a.Service {
 		return fmt.Errorf("service mismatch: expected %q, got %q", cred.Service, a.Service)
 	}
+
 	q, err := url.ParseQuery(req.URL.RawQuery)
 	if err != nil {
 		return fmt.Errorf("failed to parse query parameters: %w", err)
@@ -44,6 +46,7 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 	for k, v := range q {
 		qp[k] = strings.Join(v, ",")
 	}
+
 	sh := map[string]string{}
 	for _, k := range a.SignedHeaders {
 		v, ok := resolveHeader(k, req.Header)
@@ -64,7 +67,6 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 
 	// Then try to recreate the authorization header.
 	newa := s3.Sign()
-
 	nh, nhs := newa.ToString(""), newa.ToString(" ")
 	if h != nh && h != nhs {
 		return fmt.Errorf("signature mismatch: expected %q or %q, got %q", nh, nhs, h)
@@ -89,7 +91,7 @@ func resolveHeader(name string, h http.Header) (string, bool) {
 
 type Authorization struct {
 	Algo          string
-	AccessKeyId   string
+	AccessKeyID   string
 	Date          string
 	Region        string
 	Service       string
@@ -99,7 +101,7 @@ type Authorization struct {
 
 func (a Authorization) ToString(pad string) string {
 	return "AWS4-HMAC-" + a.Algo + " " +
-		"Credential=" + a.AccessKeyId + "/" + a.Date + "/" + a.Region + "/" + a.Service + "/aws4_request" +
+		"Credential=" + a.AccessKeyID + "/" + a.Date + "/" + a.Region + "/" + a.Service + "/aws4_request" +
 		"," + pad + "SignedHeaders=" + strings.Join(a.SignedHeaders, ";") +
 		"," + pad + "Signature=" + a.Signature
 }
@@ -107,14 +109,12 @@ func (a Authorization) ToString(pad string) string {
 func ParseHeader(header string) (Authorization, error) {
 	var empty Authorization
 	if header == "" {
-		return empty, fmt.Errorf("empty header")
+		return empty, errors.New("empty header")
 	}
-
 	matches := regexHeader.FindStringSubmatch(header)
-	if len(matches) != 8 {
-		return empty, fmt.Errorf("invalid header format")
+	if len(matches) != regexHeaderGroups {
+		return empty, errors.New("invalid header format")
 	}
-
 	names := regexHeader.SubexpNames()
 	matched := map[string]string{}
 	for i, match := range matches {
@@ -122,11 +122,9 @@ func ParseHeader(header string) (Authorization, error) {
 			matched[names[i]] = match
 		}
 	}
-
 	if matched["Algo"] != "SHA256" {
 		return empty, fmt.Errorf("unsupported algorithm: %q", matched["Algo"])
 	}
-
 	for _, key := range []string{"AccessKeyId", "Date", "Region", "Service", "SignedHeaders", "Signature"} {
 		if matched[key] == "" {
 			return empty, fmt.Errorf("missing header: %q", key)
@@ -135,7 +133,7 @@ func ParseHeader(header string) (Authorization, error) {
 
 	return Authorization{
 		Algo:          matched["Algo"],
-		AccessKeyId:   matched["AccessKeyId"],
+		AccessKeyID:   matched["AccessKeyId"],
 		Date:          matched["Date"],
 		Region:        matched["Region"],
 		Service:       matched["Service"],
@@ -145,6 +143,8 @@ func ParseHeader(header string) (Authorization, error) {
 }
 
 var regexHeader = regexp.MustCompile(`^AWS4-HMAC-(?P<Algo>SHA256)\s*Credential=(?P<AccessKeyId>.*)\/(?P<Date>[0-9]{8})\/(?P<Region>.*)\/(?P<Service>.*)\/aws4_request\,\s*SignedHeaders=(?P<SignedHeaders>.*),\s*Signature=(?P<Signature>.*)$`)
+
+const regexHeaderGroups = 8
 
 // https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html
 type s3request struct {
@@ -162,6 +162,7 @@ func (s *s3request) RequestString() string {
 	headers := canonString(s.signedHeaders, ":", "\n", false)
 	signedHeaders := strings.Join(sortedKeys(s.signedHeaders), ";")
 	hashedPayload := s.signedHeaders["x-amz-content-sha256"]
+
 	return fmt.Sprintf("%s\n%s\n%s\n%s\n\n%s\n%s", s.method, s.uri, queryString, headers, signedHeaders, hashedPayload)
 }
 
@@ -217,7 +218,7 @@ func (s *s3request) Sign() Authorization {
 	}
 	return Authorization{
 		Algo:          "SHA256",
-		AccessKeyId:   s.cred.AccessKeyId,
+		AccessKeyID:   s.cred.AccessKeyID,
 		Date:          date[:8],
 		Region:        s.cred.Region,
 		Service:       s.cred.Service,
@@ -227,15 +228,13 @@ func (s *s3request) Sign() Authorization {
 }
 
 func canonString(in map[string]string, sep string, inter string, encoding bool) string {
-	var c string
-
 	keys := make([]string, 0, len(in))
 	for k := range in {
 		keys = append(keys, k)
 	}
-
 	sort.Strings(keys)
 
+	var c string
 	for _, k := range keys {
 		if c != "" {
 			c += inter
@@ -254,7 +253,6 @@ func sortedKeys(in map[string]string) []string {
 	for k := range in {
 		keys = append(keys, strings.ToLower(k))
 	}
-
 	sort.Strings(keys)
 	return keys
 }
