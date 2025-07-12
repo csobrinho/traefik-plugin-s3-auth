@@ -72,12 +72,15 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		crds[cred.AccessKeyID] = cred
 	}
 
+	data, err := os.ReadFile("/tmp/hello")
+	fmt.Printf("XXX data: %q, err: %v\n", string(data), err)
+
 	envs := map[string]string{}
-	for _, k := range os.Environ() {
-		fmt.Println("ENV:", k)
-		// v, _ := os.LookupEnv(k)
-		// envs[k] = v
-	}
+	// for _, k := range os.Environ() {
+	// 	fmt.Println("ENV:", k)
+	// 	v, _ := os.LookupEnv(k)
+	// 	envs[k] = v
+	// }
 
 	return &Plugin{
 		next:                    next,
@@ -90,7 +93,10 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 }
 
 func (p *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	err := ValidateHeader(req, p.authorizationHeaderName, p.credentials)
+	data, err := os.ReadFile("/tmp/hello")
+	fmt.Printf("XXXX data: %q, err: %v\n", string(data), err)
+
+	err = ValidateHeader(req, p.authorizationHeaderName, p.credentials)
 	if err != nil {
 		for k, v := range p.envs {
 			fmt.Printf("ENV: %s=%s\n", k, v)
