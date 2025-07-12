@@ -75,8 +75,8 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	envs := map[string]string{}
 	for _, k := range os.Environ() {
 		fmt.Println("ENV:", k)
-		v, _ := os.LookupEnv(k)
-		envs[k] = v
+		// v, _ := os.LookupEnv(k)
+		// envs[k] = v
 	}
 
 	return &Plugin{
