@@ -28,4 +28,4 @@ require (
 )
 
 // Containous forks
-replace github.com/gorilla/mux => github.com/containous/mux v0.0.0-20220627093034-b2dd784e613f
+replace github.com/gorilla/mux => github.com/containous/mux v0.0.0-20250523120546-41b6ec3aed59
