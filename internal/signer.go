@@ -65,6 +65,9 @@ func ValidateHeader(req *http.Request, headerName string, creds []Credential) er
 	// Then try to recreate the authorization header.
 	newa := s3.Sign()
 	if nh, nhs := newa.ToString(""), newa.ToString(" "); h != nh && h != nhs {
+		for k, v := range sh {
+			log.Debugf("Signed header[%q]: %q\n", k, v)
+		}
 		return fmt.Errorf("signature mismatch expected: %q got: %q", nhs, h)
 	}
 
