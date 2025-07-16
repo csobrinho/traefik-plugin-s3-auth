@@ -19,6 +19,9 @@ linters:
     - nlreturn
     - copyloopvar # 1.19
     - intrange    # 1.19
+    - noinlineerr
+    - tagalign
+    - gomoddirectives
   settings:
     depguard:
       rules:

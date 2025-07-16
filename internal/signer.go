@@ -1,4 +1,4 @@
-package plugin
+package tsfa
 
 // Adapted from https://github.com/bluecatengineering/traefik-aws-plugin/blob/main/signer/signer.go
 
@@ -15,11 +15,7 @@ import (
 	"strings"
 )
 
-var mapping = map[string]string{
-	"host": "x-forwarded-host",
-}
-
-func ValidateHeader(req *http.Request, headerName string, creds map[string]Credential) error {
+func ValidateHeader(req *http.Request, headerName string, creds []Credential) error {
 	h := req.Header.Get(headerName)
 
 	// First check if the header can be parsed.
@@ -27,15 +23,15 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 	if err != nil {
 		return fmt.Errorf("failed to parse authorization header: %w", err)
 	}
-	cred, ok := creds[a.AccessKeyID]
-	if !ok {
-		return fmt.Errorf("unknown access key id: %q", a.AccessKeyID)
+	var cred *Credential
+	for _, c := range creds {
+		if c.AccessKeyID == a.AccessKeyID && c.Region == a.Region && c.Service == a.Service {
+			cred = &c
+			break
+		}
 	}
-	if cred.Region != a.Region {
-		return fmt.Errorf("region mismatch: expected %q, got %q", cred.Region, a.Region)
-	}
-	if cred.Service != a.Service {
-		return fmt.Errorf("service mismatch: expected %q, got %q", cred.Service, a.Service)
+	if cred == nil {
+		return fmt.Errorf("unknown access key id: %q, region: %q, service: %q", a.AccessKeyID, a.Region, a.Service)
 	}
 
 	q, err := url.ParseQuery(req.URL.RawQuery)
@@ -49,7 +45,7 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 
 	sh := map[string]string{}
 	for _, k := range a.SignedHeaders {
-		v, ok := resolveHeader(k, req.Header)
+		v, ok := resolveHeader(k, req, req.Header)
 		if !ok {
 			return fmt.Errorf("missing signed header: %q", k)
 		}
@@ -57,7 +53,7 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 	}
 
 	s3 := &s3request{
-		cred:          cred,
+		cred:          *cred,
 		method:        req.Method,
 		uri:           req.URL.Path,
 		date:          a.Date,
@@ -67,26 +63,30 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 
 	// Then try to recreate the authorization header.
 	newa := s3.Sign()
-	nh, nhs := newa.ToString(""), newa.ToString(" ")
-	if h != nh && h != nhs {
-		return fmt.Errorf("signature mismatch: expected %q or %q, got %q", nh, nhs, h)
+	if nh, nhs := newa.ToString(""), newa.ToString(" "); h != nh && h != nhs {
+		return fmt.Errorf("signature mismatch expected: %q got: %q", nhs, h)
 	}
 
 	// Signature is valid.
 	return nil
 }
 
-func resolveHeader(name string, h http.Header) (string, bool) {
-	v := h.Values(name)
-	if v == nil {
-		v = h.Values(strings.ToLower(name))
-	}
-	if v == nil {
-		if hh, ok := mapping[strings.ToLower(name)]; ok {
-			return resolveHeader(hh, h)
+func resolveHeader(name string, req *http.Request, h http.Header) (string, bool) {
+	switch strings.ToLower(name) {
+	case "host":
+		return req.Host, true
+	case "method":
+		return req.Method, true
+	default:
+		v := h.Values(name)
+		if v == nil {
+			v = h.Values(strings.ToLower(name))
 		}
+		if v == nil {
+			return "", false
+		}
+		return strings.Join(v, ", "), len(v) > 0
 	}
-	return strings.Join(v, ", "), len(v) > 0
 }
 
 type Authorization struct {
