@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -45,7 +46,7 @@ func ValidateHeader(req *http.Request, headerName string, creds []Credential) er
 
 	sh := map[string]string{}
 	for _, k := range a.SignedHeaders {
-		v, ok := resolveHeader(k, req, req.Header)
+		v, ok := resolveValue(k, req, req.Header)
 		if !ok {
 			return fmt.Errorf("missing signed header: %q", k)
 		}
@@ -71,12 +72,14 @@ func ValidateHeader(req *http.Request, headerName string, creds []Credential) er
 	return nil
 }
 
-func resolveHeader(name string, req *http.Request, h http.Header) (string, bool) {
+func resolveValue(name string, req *http.Request, h http.Header) (string, bool) {
 	switch strings.ToLower(name) {
 	case "host":
 		return req.Host, true
 	case "method":
 		return req.Method, true
+	case "content-length":
+		return strconv.FormatInt(req.ContentLength, 10), true
 	default:
 		v := h.Values(name)
 		if v == nil {
