@@ -20,16 +20,6 @@ func NewServer() *Server {
 	return s
 }
 
-func (s *Server) buildRoutes() {
-	var err error
-	s.muxer, err = muxhttp.NewMuxer()
-	if err != nil {
-		log.Fatal(err)
-	}
-	// Add a default handler.
-	s.muxer.NewRoute().Handler(s.AuthHandler())
-}
-
 // RootHandler overwrites the request method, host and URL with those from the
 // forwarded request so it's correctly routed by mux.
 func (s *Server) RootHandler(w http.ResponseWriter, r *http.Request) {
@@ -62,6 +52,16 @@ func (s *Server) AuthHandler() http.HandlerFunc {
 		logger.Debug("Allowing valid request")
 		w.WriteHeader(http.StatusOK)
 	}
+}
+
+func (s *Server) buildRoutes() {
+	var err error
+	s.muxer, err = muxhttp.NewMuxer()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Add a default handler.
+	s.muxer.NewRoute().Handler(s.AuthHandler())
 }
 
 func (s *Server) logger(r *http.Request, handler, msg string) *logrus.Entry {

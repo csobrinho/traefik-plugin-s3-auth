@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	internal "github.com/csobrinho/traefik-s3-forward-auth/internal"
 )
@@ -28,5 +29,13 @@ func main() {
 	// Start.
 	log.WithField("config", config).Debug("Starting with config")
 	log.Infof("Listening on :%d", config.Port)
-	log.Info(http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil))
+
+	s := &http.Server{
+		Addr:              fmt.Sprintf(":%d", config.Port),
+		ReadTimeout:       10 * time.Second, //nolint:mnd
+		ReadHeaderTimeout: 10 * time.Second, //nolint:mnd
+		WriteTimeout:      10 * time.Second, //nolint:mnd
+		IdleTimeout:       60 * time.Second, //nolint:mnd
+	}
+	log.Info(s.ListenAndServe())
 }

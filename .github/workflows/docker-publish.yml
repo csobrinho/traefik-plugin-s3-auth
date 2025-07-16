@@ -3,13 +3,11 @@ name: Container Image Publish
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [main]
     # Publish semver tags as releases.
-    tags: [ 'v*.*.*' ]
+    tags: ["v*.*.*"]
   pull_request:
-    branches: [ main ]
-  schedule:
-    - cron: "0 0 */5 * *"
+    branches: [main]
 
 env:
   REGISTRY: ghcr.io
