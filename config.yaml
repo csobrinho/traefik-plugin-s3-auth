@@ -1,0 +1,13 @@
+# Example configuration file for Traefik S3 Forward Auth.
+logLevel: debug
+logFormat: pretty
+statusCode: 404
+credentials:
+  - accessKeyId: Access_Access_Access
+    accessSecretKey: 1234567890123456789012345678901234567890
+    region: us-east-1
+    service: s3
+  - accessKeyId: SSECCA_SSECCA_SSECCA
+    accessSecretKey: 9876543210987654321098765432109876543210
+    region: us-west-2
+    service: s4

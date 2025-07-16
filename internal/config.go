@@ -54,12 +54,10 @@ func (c *Config) parseFlags(args []string) error {
 	cf := &Config{}
 	c.Config = func(s string) error {
 		b, err := os.ReadFile(s)
-		fmt.Printf("reading config file %q, err: %v\n", s, err)
 		if err != nil {
 			return fmt.Errorf("error reading config file: %w", err)
 		}
 		err = yaml.Unmarshal(b, cf)
-		fmt.Printf("parsing config yaml: %+v, err: %v\n", cf, err)
 		if err != nil {
 			return fmt.Errorf("error parsing config YAML: %w", err)
 		}
@@ -86,8 +84,6 @@ func (c *Config) parseFlags(args []string) error {
 	if cf.StatusCode != 0 {
 		c.StatusCode = cf.StatusCode
 	}
-
-	fmt.Printf("config: %+v\n", c)
 	return nil
 }
 
