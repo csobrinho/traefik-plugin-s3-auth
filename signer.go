@@ -12,30 +12,28 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
-var mapping = map[string]string{
-	"host": "x-forwarded-host",
-}
-
-func ValidateHeader(req *http.Request, headerName string, creds map[string]Credential) error {
+func validateHeader(req *http.Request, headerName string, creds []*Credential) error {
 	h := req.Header.Get(headerName)
 
 	// First check if the header can be parsed.
-	a, err := ParseHeader(h)
+	a, err := parseHeader(h)
 	if err != nil {
 		return fmt.Errorf("failed to parse authorization header: %w", err)
 	}
-	cred, ok := creds[a.AccessKeyID]
-	if !ok {
-		return fmt.Errorf("unknown access key id: %q", a.AccessKeyID)
+
+	var cred *Credential
+	for _, c := range creds {
+		if c.AccessKeyID == a.AccessKeyID && c.Region == a.Region && c.Service == a.Service {
+			cred = c
+			break
+		}
 	}
-	if cred.Region != a.Region {
-		return fmt.Errorf("region mismatch: expected %q, got %q", cred.Region, a.Region)
-	}
-	if cred.Service != a.Service {
-		return fmt.Errorf("service mismatch: expected %q, got %q", cred.Service, a.Service)
+	if cred == nil {
+		return fmt.Errorf("unknown access key id: %q, region: %q, service: %q", a.AccessKeyID, a.Region, a.Service)
 	}
 
 	q, err := url.ParseQuery(req.URL.RawQuery)
@@ -49,7 +47,7 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 
 	sh := map[string]string{}
 	for _, k := range a.SignedHeaders {
-		v, ok := resolveHeader(k, req.Header)
+		v, ok := resolveValue(k, req)
 		if !ok {
 			return fmt.Errorf("missing signed header: %q", k)
 		}
@@ -57,7 +55,7 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 	}
 
 	s3 := &s3request{
-		cred:          cred,
+		cred:          *cred,
 		method:        req.Method,
 		uri:           req.URL.Path,
 		date:          a.Date,
@@ -66,9 +64,11 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 	}
 
 	// Then try to recreate the authorization header.
-	newa := s3.Sign()
-	nh, nhs := newa.ToString(""), newa.ToString(" ")
-	if h != nh && h != nhs {
+	newa := s3.sign()
+	if nh, nhs := newa.ToString(""), newa.ToString(" "); h != nh && h != nhs {
+		for k, v := range sh {
+			fmt.Printf("- signed header %s: %s\n", k, v)
+		}
 		return fmt.Errorf("signature mismatch: expected %q or %q, got %q", nh, nhs, h)
 	}
 
@@ -76,20 +76,27 @@ func ValidateHeader(req *http.Request, headerName string, creds map[string]Crede
 	return nil
 }
 
-func resolveHeader(name string, h http.Header) (string, bool) {
-	v := h.Values(name)
-	if v == nil {
-		v = h.Values(strings.ToLower(name))
-	}
-	if v == nil {
-		if hh, ok := mapping[strings.ToLower(name)]; ok {
-			return resolveHeader(hh, h)
+func resolveValue(name string, req *http.Request) (string, bool) {
+	switch strings.ToLower(name) {
+	case "host":
+		return req.Host, true
+	case "method":
+		return req.Method, true
+	case "content-length":
+		return strconv.FormatInt(req.ContentLength, 10), true
+	default:
+		v := req.Header.Values(name)
+		if v == nil {
+			v = req.Header.Values(strings.ToLower(name))
 		}
+		if v == nil {
+			return "", false
+		}
+		return strings.Join(v, ", "), len(v) > 0
 	}
-	return strings.Join(v, ", "), len(v) > 0
 }
 
-type Authorization struct {
+type authorization struct {
 	Algo          string
 	AccessKeyID   string
 	Date          string
@@ -99,15 +106,15 @@ type Authorization struct {
 	Signature     string
 }
 
-func (a Authorization) ToString(pad string) string {
+func (a authorization) ToString(pad string) string {
 	return "AWS4-HMAC-" + a.Algo + " " +
 		"Credential=" + a.AccessKeyID + "/" + a.Date + "/" + a.Region + "/" + a.Service + "/aws4_request" +
 		"," + pad + "SignedHeaders=" + strings.Join(a.SignedHeaders, ";") +
 		"," + pad + "Signature=" + a.Signature
 }
 
-func ParseHeader(header string) (Authorization, error) {
-	var empty Authorization
+func parseHeader(header string) (authorization, error) {
+	var empty authorization
 	if header == "" {
 		return empty, errors.New("empty header")
 	}
@@ -131,7 +138,7 @@ func ParseHeader(header string) (Authorization, error) {
 		}
 	}
 
-	return Authorization{
+	return authorization{
 		Algo:          matched["Algo"],
 		AccessKeyID:   matched["AccessKeyId"],
 		Date:          matched["Date"],
@@ -157,7 +164,7 @@ type s3request struct {
 }
 
 // https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html#create-canonical-request
-func (s *s3request) RequestString() string {
+func (s *s3request) requestString() string {
 	queryString := canonString(s.queryParams, "=", "&", true)
 	headers := canonString(s.signedHeaders, ":", "\n", false)
 	signedHeaders := strings.Join(sortedKeys(s.signedHeaders), ";")
@@ -167,7 +174,7 @@ func (s *s3request) RequestString() string {
 }
 
 // https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html#create-string-to-sign
-func (s *s3request) StringToSignV4() string {
+func (s *s3request) stringToSignV4() string {
 	algorithm := "AWS4-HMAC-SHA256"
 
 	requestDateTime := s.date
@@ -178,7 +185,7 @@ func (s *s3request) StringToSignV4() string {
 	credentialScope := requestDateTime[:8] + "/" + s.cred.Region + "/" + s.cred.Service + "/aws4_request"
 
 	sha := sha256.New()
-	sha.Write([]byte(s.RequestString()))
+	sha.Write([]byte(s.requestString()))
 	canonRequestSha := sha.Sum(nil)
 	hashedCanonRequest := hex.EncodeToString(canonRequestSha)
 
@@ -186,7 +193,7 @@ func (s *s3request) StringToSignV4() string {
 }
 
 // https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html#calculate-signature
-func (s *s3request) SignatureV4() string {
+func (s *s3request) signatureV4() string {
 	date := s.date
 	if amzDate, ok := s.signedHeaders["x-amz-date"]; ok {
 		date = amzDate
@@ -205,25 +212,25 @@ func (s *s3request) SignatureV4() string {
 	signingKey.Write([]byte("aws4_request"))
 
 	signatureV4 := hmac.New(sha256.New, signingKey.Sum(nil))
-	signatureV4.Write([]byte(s.StringToSignV4()))
+	signatureV4.Write([]byte(s.stringToSignV4()))
 
 	return hex.EncodeToString(signatureV4.Sum(nil))
 }
 
 // https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html#add-signature-to-request
-func (s *s3request) Sign() Authorization {
+func (s *s3request) sign() authorization {
 	date := s.date
 	if amzDate, ok := s.signedHeaders["x-amz-date"]; ok {
 		date = amzDate
 	}
-	return Authorization{
+	return authorization{
 		Algo:          "SHA256",
 		AccessKeyID:   s.cred.AccessKeyID,
 		Date:          date[:8],
 		Region:        s.cred.Region,
 		Service:       s.cred.Service,
 		SignedHeaders: sortedKeys(s.signedHeaders),
-		Signature:     s.SignatureV4(),
+		Signature:     s.signatureV4(),
 	}
 }
 

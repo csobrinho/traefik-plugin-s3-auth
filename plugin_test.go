@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	plugin "github.com/csobrinho/traefik-s3-auth-middleware"
+	plugin "github.com/csobrinho/traefik-plugin-s3-auth"
 )
 
 func setHeaders(t *testing.T, h http.Header) {
@@ -28,7 +28,7 @@ func setHeaders(t *testing.T, h http.Header) {
 func TestPlugin(t *testing.T) {
 	tc := []struct {
 		name           string
-		crds           []plugin.Credential
+		crds           []*plugin.Credential
 		method         string
 		authorization  string
 		expectedStatus int
@@ -36,7 +36,7 @@ func TestPlugin(t *testing.T) {
 	}{
 		{
 			name: "valid credentials",
-			crds: []plugin.Credential{
+			crds: []*plugin.Credential{
 				{
 					AccessKeyID:     "ACCESS_ACCESS_ACCESS",
 					AccessSecretKey: "SECRET12secret123456SECRET12secret123456",
@@ -50,7 +50,7 @@ func TestPlugin(t *testing.T) {
 		},
 		{
 			name: "invalid credentials",
-			crds: []plugin.Credential{
+			crds: []*plugin.Credential{
 				{
 					AccessKeyID:     "ACCESS_ACCESS_2222AC",
 					AccessSecretKey: "SECRET12secret123456SECRET12secret123456",
@@ -65,7 +65,7 @@ func TestPlugin(t *testing.T) {
 		},
 		{
 			name: "invalid header",
-			crds: []plugin.Credential{
+			crds: []*plugin.Credential{
 				{
 					AccessKeyID:     "ACCESS_ACCESS_2222AC",
 					AccessSecretKey: "SECRET12secret123456SECRET12secret123456",
@@ -108,7 +108,7 @@ func TestPlugin(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			req.Header.Set(cfg.AuthorizationHeaderName, tt.authorization)
+			req.Header.Set(cfg.HeaderName, tt.authorization)
 			setHeaders(t, req.Header)
 
 			handler.ServeHTTP(recorder, req)

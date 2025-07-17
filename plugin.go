@@ -5,14 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 )
 
 type Config struct {
-	AuthorizationHeaderName string       `json:"headerName,omitempty"`
-	RemoveHeadersOnSuccess  bool         `json:"removeHeadersOnSuccess,omitempty"`
-	StatusCode              int          `json:"statusCode,omitempty"`
-	Credentials             []Credential `json:"credentials,omitempty"`
+	HeaderName  string        `json:"headerName,omitempty"`
+	StatusCode  int           `json:"statusCode,omitempty"`
+	Credentials []*Credential `json:"credentials,omitempty"`
 }
 
 type Credential struct {
@@ -24,19 +22,16 @@ type Credential struct {
 
 func CreateConfig() *Config {
 	return &Config{
-		AuthorizationHeaderName: "Authorization",
-		RemoveHeadersOnSuccess:  false,
-		StatusCode:              http.StatusForbidden,
+		HeaderName: "Authorization",
+		StatusCode: http.StatusForbidden,
 	}
 }
 
 type Plugin struct {
-	next                    http.Handler
-	authorizationHeaderName string
-	removeHeadersOnSuccess  bool
-	statusCode              int
-	credentials             map[string]Credential
-	envs                    map[string]string
+	next        http.Handler
+	headerName  string
+	statusCode  int
+	credentials []*Credential
 }
 
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
@@ -50,63 +45,31 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		if cred.AccessKeyID == "" || cred.AccessSecretKey == "" {
 			return nil, errors.New("must specify both `keyId` and `secretKey` for each credential")
 		}
-
 		if cred.Region == "" {
 			return nil, errors.New("must specify the region for each credential, eg: `us-east-1`")
 		}
-
 		if cred.Service == "" {
 			return nil, errors.New("must specify the service for each credential, eg: `s3`")
 		}
 	}
 	// Check the authorization header is not empty.
-	if config.AuthorizationHeaderName == "" {
+	if config.HeaderName == "" {
 		return nil, errors.New("must specify the authorization header name")
 	}
-
-	crds := map[string]Credential{}
-	for _, cred := range config.Credentials {
-		if _, exists := crds[cred.AccessKeyID]; exists {
-			return nil, fmt.Errorf("duplicate access key id found: %q", cred.AccessKeyID)
-		}
-		crds[cred.AccessKeyID] = cred
-	}
-
-	data, err := os.ReadFile("/tmp/hello")
-	fmt.Fprintf(os.Stderr, "XXX data: %q, err: %v\n", string(data), err)
-
-	envs := map[string]string{}
-	// for _, k := range os.Environ() {
-	// 	fmt.Println("ENV:", k)
-	// 	v, _ := os.LookupEnv(k)
-	// 	envs[k] = v
-	// }
-
 	return &Plugin{
-		next:                    next,
-		credentials:             crds,
-		authorizationHeaderName: config.AuthorizationHeaderName,
-		removeHeadersOnSuccess:  config.RemoveHeadersOnSuccess,
-		statusCode:              config.StatusCode,
-		envs:                    envs,
+		next:        next,
+		credentials: config.Credentials,
+		headerName:  config.HeaderName,
+		statusCode:  config.StatusCode,
 	}, nil
 }
 
 func (p *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	data, err := os.ReadFile("/tmp/hello")
-	fmt.Fprintf(os.Stderr, "XXXX data: %q, err: %v\n", string(data), err)
-
-	err = ValidateHeader(req, p.authorizationHeaderName, p.credentials)
-	if err != nil {
-		for k, v := range p.envs {
-			fmt.Printf("ENV: %s=%s\n", k, v)
-		}
+	if err := validateHeader(req, p.headerName, p.credentials); err != nil {
+		fmt.Printf("%q header validation failed: %v\n", p.headerName, err)
 		http.Error(rw, http.StatusText(p.statusCode), p.statusCode)
 		return
 	}
 
-	if p.removeHeadersOnSuccess {
-		req.Header.Del(p.authorizationHeaderName)
-	}
 	p.next.ServeHTTP(rw, req)
 }

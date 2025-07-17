@@ -19,6 +19,7 @@ linters:
     - nlreturn
     - copyloopvar # 1.19
     - intrange    # 1.19
+    - noinlineerr
   settings:
     depguard:
       rules:

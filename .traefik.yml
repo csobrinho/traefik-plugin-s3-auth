@@ -1,12 +1,11 @@
 displayName: S3 Authorization Plugin
 type: middleware
 iconPath: .assets/icon.png
-import: github.com/csobrinho/traefik-s3-auth-middleware
+import: github.com/csobrinho/traefik-plugin-s3-auth
 summary: "Traefik middleware plugin that validates the S3 Authorization header"
 
 testData:
   headerName: Authorization      # Default
-  removeHeadersOnSuccess: false  # Default
   statusCode: 403                # Default
   credentials:
     - accessKeyId: ACCESS_ACCESS_ACCESS
