@@ -82,7 +82,11 @@ func resolveValue(name string, req *http.Request, h http.Header) (string, bool) 
 	case "method":
 		return req.Method, true
 	case "content-length":
-		return strconv.FormatInt(req.ContentLength, 10), true
+		v := h.Get("X-Forwarded-Content-Length")
+		if v == "" {
+			v = strconv.FormatInt(req.ContentLength, 10)
+		}
+		return v, true
 	default:
 		v := h.Values(name)
 		if v == nil {
