@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	plugin "github.com/csobrinho/traefik-plugin-s3-auth"
 )
@@ -102,6 +103,8 @@ func TestPlugin(t *testing.T) {
 				}
 				t.Fatal(err)
 			}
+			p := handler.(*plugin.Plugin)
+			p.Now = func() time.Time { return time.Date(2025, 7, 10, 5, 45, 0, 0, time.UTC) }
 
 			recorder := httptest.NewRecorder()
 			req, err := http.NewRequestWithContext(ctx, tt.method, "https://s3.example.com/foo/bar/?x=y&z=0", nil)

@@ -14,9 +14,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
-func validateHeader(req *http.Request, headerName string, creds []*Credential) error {
+func validateHeader(req *http.Request, headerName string, creds []*Credential, now time.Time) error {
 	h := req.Header.Get(headerName)
 
 	// First check if the header can be parsed.
@@ -53,6 +54,12 @@ func validateHeader(req *http.Request, headerName string, creds []*Credential) e
 		}
 		sh[k] = v
 	}
+	// Check if x-amz-date is present in the signed headers.
+	if d := sh["x-amz-date"]; d != "" {
+		if err := checkTime(d, now, 15*time.Minute); err != nil {
+			return fmt.Errorf("request time too skewed: %w", err)
+		}
+	}
 
 	s3 := &s3request{
 		cred:          *cred,
@@ -73,6 +80,18 @@ func validateHeader(req *http.Request, headerName string, creds []*Credential) e
 	}
 
 	// Signature is valid.
+	return nil
+}
+
+func checkTime(date string, now time.Time, max time.Duration) error {
+	t, err := time.Parse("20060102T150405Z", date)
+	if err != nil {
+		return fmt.Errorf("failed to parse time from header: %w", err)
+	}
+	// Check if the difference between the current time and the header is less than the threshold.
+	if nmt := now.Sub(t); nmt > max {
+		return fmt.Errorf("request timestamp is too old: %v", nmt)
+	}
 	return nil
 }
 

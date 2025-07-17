@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 type Config struct {
@@ -32,6 +33,7 @@ type Plugin struct {
 	headerName  string
 	statusCode  int
 	credentials []*Credential
+	Now         func() time.Time
 }
 
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
@@ -61,11 +63,12 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		credentials: config.Credentials,
 		headerName:  config.HeaderName,
 		statusCode:  config.StatusCode,
+		Now:         time.Now,
 	}, nil
 }
 
 func (p *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if err := validateHeader(req, p.headerName, p.credentials); err != nil {
+	if err := validateHeader(req, p.headerName, p.credentials, p.Now()); err != nil {
 		fmt.Printf("%q header validation failed: %v\n", p.headerName, err)
 		http.Error(rw, http.StatusText(p.statusCode), p.statusCode)
 		return
