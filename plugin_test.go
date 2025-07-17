@@ -1,4 +1,4 @@
-package plugin_test
+package traefik_plugin_s3_auth_test
 
 import (
 	"context"

@@ -1,4 +1,4 @@
-package plugin
+package traefik_plugin_s3_auth
 
 // Adapted from https://github.com/bluecatengineering/traefik-aws-plugin/blob/main/signer/signer.go
 

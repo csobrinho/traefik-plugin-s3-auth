@@ -1,4 +1,4 @@
-package plugin
+package traefik_plugin_s3_auth //nolint:revive,nolintlint
 
 import (
 	"context"
