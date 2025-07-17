@@ -23,10 +23,10 @@ func NewServer() *Server {
 // RootHandler overwrites the request method, host and URL with those from the
 // forwarded request so it's correctly routed by mux.
 func (s *Server) RootHandler(w http.ResponseWriter, r *http.Request) {
-	log.Infof("%s %s\n", r.Method, r.URL.Path)
-	log.Infof("Host: %s\n", r.Host)
+	log.Infof("%s %s", r.Method, r.URL.Path)
+	log.Infof("Host: %s", r.Host)
 	for k, v := range r.Header {
-		log.Infof("%s: %s\n", k, v)
+		log.Infof("%s: %s", k, v)
 	}
 
 	// Modify request.
